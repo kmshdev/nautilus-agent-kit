@@ -1,0 +1,12 @@
+.agents/*
+!.agents/plugins/
+!.agents/plugins/marketplace.json
+!.agents/
+.agent/
+target/
+__pycache__/
+*.py[cod]
+.DS_Store
+.venv/
+.env*
+*.log
