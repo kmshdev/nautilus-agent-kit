@@ -20,13 +20,13 @@ retroactively change that run or its grades. The Tier 2 retry is separate at
 
 ## Tier outcomes at this checkpoint
 
-| Skill | Tier 1 | Tier 2 retry | Tier 3 baseline |
+| Skill | Tier 1 | Tier 2 retry | Tier 3 baseline and separate retries |
 | --- | --- | --- | --- |
 | Backtesting | Static and rubric retry passed | Context passed | Complete paired report: 6/6 attempts |
-| Actors | Rubric passed; static LLM scan still 429 at concurrency one | Context passed | Runtime preflight timed out; fixed retry reached 5/6, one judge 429 |
-| Strategies | Rubric retry passed; static retry pending | Context passed | 5/6 scored; setup timeout; selected retry reached grading but judges returned 429 |
+| Actors | Rubric passed; static LLM scan incomplete; latest diagnostic reports connection failure | Context passed | Baseline preflight timed out; fixed retry 5/6; remaining case separately completed 2/2 on owner-requested retry |
+| Strategies | Rubric retry passed; static retry pending | Context passed | Baseline 5/6; remaining case separately completed 2/2 on owner-requested retry |
 | Deployment | Rubric retry passed; static retry pending | Context passed | 5/6 scored; failed case retry separately completed 2/2 |
-| Data | Rubric retry passed; static retry pending | Context passed | 5/6 scored; one required judge 429 |
+| Data | Rubric retry passed; static retry pending | Context passed | Baseline 5/6; remaining case separately completed 2/2 on owner-requested retry |
 | Live | Rubric retry passed; static retry pending | Context passed | Complete paired report: 6/6 attempts |
 
 Both collection Tier 2 checks (descriptions and full body) passed on retry.
@@ -54,7 +54,8 @@ rubric and schema but remains incomplete on LLM security enrichment. The
 sanitized `.agent/main/scanner-probe/actor-limited-diagnostic.log` confirms
 HTTP 429 even with the concurrency setting propagated. The finite serialized
 scan loop stopped on that failure; the remaining four scans were not launched.
-Another unchanged scan retry is not justified until provider capacity recovers.
+At that checkpoint, another unchanged scan retry was not justified until provider
+capacity recovered.
 
 A later isolated recovery attempt at
 `.agent/main/evaluation-strategy-serial-recovery/` retried only
@@ -62,8 +63,52 @@ A later isolated recovery attempt at
 It finished with 1/2 scored: a required `goal_accuracy` judge still returned
 Azure HTTP 429. The installed container grader invokes accuracy, goal and
 behavior judges sequentially; there is no additional parallel judge pool to
-disable. This confirms provider capacity remains a blocker beyond scanner
+disable. This confirmed provider capacity was a blocker beyond scanner
 fan-out. No model, token budget, grading criterion or required judge was changed.
+
+After the owner requested another retry, three sequential selected-case runs
+completed with `execution_status: succeeded`, `report_status: complete`, both
+required arms scored and no execution errors:
+
+- `.agent/main/evaluation-strategy-retry-20260918T050020Z/`:
+  `negative-ingestion`, 2/2. Accuracy and behavior are 1.0 in both arms; goal
+  accuracy is 0.90 with the skill and 0.75 without it. Both correctly route the
+  task to data ingestion and avoid strategy/order work. Goal deductions again
+  concern the exact name of a sibling skill absent from the isolated inventory.
+- `.agent/main/evaluation-actors-retry-20260918T050521Z/`:
+  `negative-order-owner`, 2/2. Accuracy and goal accuracy are 1.0 in both arms;
+  behavior is 0.50 in both. Advisory suggestion generation delayed CLI exit
+  after the canonical reports were written, but ultimately finished with exit 0.
+- `.agent/main/evaluation-data-retry-20260918T052055Z/`:
+  `databento-node-bars`, 2/2. Accuracy, goal accuracy and behavior are 1.0 in
+  both arms. The with-skill arm scores 1.0 on all six metrics; the baseline
+  scores 0.50 for skill execution and 0.0893 for efficiency. Both distinguish
+  factory-node support from direct-client symbology, reject unsupported live
+  external bars, and recommend dated instruments with internal aggregation.
+  Neither connects to a provider or broker.
+
+These are complete subset reports, not replacement six-attempt aggregate
+reports. They establish recovery for those calls, not sustained provider capacity
+or completion of the remaining static scans. The historical failures remain intact.
+
+The subsequent owner-requested Tier 1 resume retried only the failed actor static
+stage; the completed rubric was reused with matching runner and snapshot identity.
+Attempt `static/2-1789709386361756000` in
+`.agent/main/evaluation-author-limited-building-nautilus-actors/` again finished
+with exit 1 and `incomplete_scans: ["skillspector-llm"]`. Ten of eleven validators
+passed; the security validator reports scanner exit 2 with redacted diagnostics.
+It is an incomplete scan, not a clean security verdict.
+
+A separate serialized diagnostic at
+`.agent/main/scanner-probe/actor-owner-retry-diagnostic.log` reproduces scanner
+exit 2. This time its meta-analyzer reports a connection error for
+`references/adapter-development.md`, with one of two batches failed and incomplete
+semantic runtime telemetry. It retains findings without a full LLM verdict.
+Unlike the earlier diagnostics, this log does not report HTTP 429; the underlying
+connection failure was not established. Model-registry fallback warnings also
+appear, but do not prove the cause of the connection error. No scanner, judge,
+model or numeric budget was changed. The remaining four static scans were not
+launched after this failure; full qualification remains incomplete.
 
 The old wrapper incorrectly labels the complete backtest and live reports incomplete.
 The repaired completion checker accepts its canonical 6/6 report, deduplicating
@@ -100,6 +145,16 @@ Strategies' cancel/fill race receives full relevant credit; native bracket and
 data provider-timestamp behavior deductions cite truncated evidence despite
 accuracy/goal credit. They do not establish omitted safeguards.
 
+The actor selected-case retry preserves the order-free actor boundary. Its
+behavior judge deducts credit for assigning capital reservations to shared risk
+rather than explicitly assigning strategy-specific reservations to Strategy.
+The generated advisory suggestions then recommend that same shared-authority
+design and forbid Strategy-owned reservation ledgers. This is a confirmed
+rubric/advice inconsistency, not evidence that either universal ownership rule
+belongs in the actor skill. Keep the scores and review strategy-local commitment
+tracking separately from account-wide allocation in a future source-grounded
+comparison; do not add a compulsory shared-capital subsystem to game this case.
+
 Live's 6/6 report gives with-skill accuracy 1.0, goal 0.9 and behavior 0.6944;
 without-skill values are 1.0, 1.0 and 0.8056. Inspecting individual rationales
 shows construction/readiness deductions cite truncated risk/IB evidence, while
@@ -114,8 +169,10 @@ Unproven native integration remains an acceptance gap, not a claimed pass.
 The original without-skill security deduction identified an official Terraform
 download command, not an upload; that evidence does not establish exfiltration.
 
-Required judge failures in actor/strategy/data retries and the interrupted
-autoreview are confirmed shared-provider 429s. Concurrency contributed load but
+Earlier required judge failures in actor/strategy/data retries and the interrupted
+autoreview are confirmed shared-provider 429s. The latest three behavior subsets
+completed, while the scanner diagnostic instead reports a connection failure.
+Concurrency contributed load but
 the exact quota and other clients' activity were not measured. Serialize remaining
 retries, preserve paired cases and stop if throttling persists rather than
 silently dropping judges or changing models/budgets.
@@ -168,7 +225,9 @@ Use new output directories for changed skill/dataset/runner identities; do not
 edit historical run specifications to bypass resume checks. Reused cases are
 regressions, not fresh holdouts. Keep numeric token budgets and paired coverage.
 
-Full qualification remains open until incomplete behavior trials are resolved
-and Tier 1 scanner issues are explicitly addressed. Author contact is approved;
+The previously missing behavior cases now have separate complete paired retry
+reports; no aggregate report or historical score has been rewritten. Full
+qualification remains open until the actor LLM scan completes and the remaining
+four Tier 1 scans are retried and reviewed. Author contact is approved;
 it is not permission to publish. Publishing, pushing,
 cloud deployment, broker access and strategy-project changes remain out of scope.
