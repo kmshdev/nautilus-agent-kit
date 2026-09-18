@@ -33,6 +33,53 @@ PATCHES = {
         'if leaf.startswith("gpt-5") or leaf == "claude-mythos-preview":',
         'if leaf.startswith(("gpt-5", "gpt-6")) or leaf == "claude-mythos-preview":',
     ),
+    "validators/rubric_eval.py": (
+        'f"SKILL.md Content:\\n---\\n{skill_content}\\n---\\n\\n"',
+        'f"SKILL.md Content:\\n<skill_document>\\n{skill_content}\\n</skill_document>\\n\\n"',
+    ),
+    "validators/security.py": (
+        '_SKILLSPECTOR_PROCESS_ENV_NAMES = frozenset(\n    {\n        "COMSPEC",',
+        '_SKILLSPECTOR_PROCESS_ENV_NAMES = frozenset(\n    {\n        "SKILLSPECTOR_MAX_LLM_CONCURRENCY",\n        "COMSPEC",',
+    ),
+    "tier3/harbor/runner.py": (
+        '    return environment\n\n\ndef _independent_anthropic_agent_credentials()',
+        '    environment["PYTHONPATH"] = str(Path(__file__).resolve().parents[3])\n'
+        '    return environment\n\ndef _independent_anthropic_agent_credentials()',
+    ),
+    "tier3/harbor/secure_docker_environment.py": (
+        '''            await self._run_docker_compose_command(
+                [
+                    "exec",
+                    "-T",
+                    "-u",
+                    "root",
+                    "main",
+                    "sh",
+                    "-c",
+                    'umask 077; cat > "$1"',
+                    "sh",
+                    remote_path,
+                ],
+                check=True,
+                stdin_bytes=_render_environment_script(merged).encode("utf-8"),''',
+        '''            payload = _render_environment_script(merged).encode("utf-8")
+            await self._run_docker_compose_command(
+                [
+                    "exec",
+                    "-T",
+                    "-u",
+                    "root",
+                    "main",
+                    "sh",
+                    "-c",
+                    'umask 077; head -c "$2" > "$1" && [ "$(wc -c < "$1")" -eq "$2" ]',
+                    "sh",
+                    remote_path,
+                    str(len(payload)),
+                ],
+                check=True,
+                stdin_bytes=payload,''',
+    ),
 }
 TOKEN_LIMIT_SELECTORS = {
     "inference/client.py": (
@@ -69,6 +116,7 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--tool-bin", type=Path, action="append", default=[], help="Additional scanner bin directory")
     parser.add_argument("--tiers", default="1,2,3", help="Comma-separated subset of 1,2,3")
     parser.add_argument("--dataset", default="working", help="working, acceptance, or skill-relative JSON path")
+    parser.add_argument("--case-id", action="append", default=[], help="Select explicit case IDs for a paired retry")
     parser.add_argument("--gateway", choices=("auto", "neon", "none"), default="auto")
     parser.add_argument("--agent-model", help="OpenCode provider/model; inferred for OpenAI-compatible grading")
     parser.add_argument("--agent-base-url", help="Agent-only SDK base; must share the grader's HTTPS origin")
@@ -219,7 +267,8 @@ def agent_base(base: str | None, gateway: str, override: str | None) -> str | No
     return urlunsplit((parsed.scheme, parsed.netloc, "/openai/v1", "", ""))
 
 
-def stage_skill(source: Path, target: Path, dataset: str, tier3: bool, base: str | None) -> None:
+def stage_skill(source: Path, target: Path, dataset: str, tier3: bool, base: str | None,
+                case_ids: list[str] | None = None) -> None:
     import yaml
     target.mkdir(parents=True)
     for path in files(source):
@@ -232,8 +281,19 @@ def stage_skill(source: Path, target: Path, dataset: str, tier3: bool, base: str
     selected = (target / relative).resolve()
     if not selected.is_relative_to(target.resolve()):
         raise ValueError("Dataset must be inside the selected skill")
+    if case_ids and not selected.is_file():
+        raise ValueError("--case-id requires an existing JSON dataset")
     if selected.is_file():
         content = selected.read_bytes()
+        if case_ids:
+            value = json.loads(content)
+            requested = set(case_ids)
+            from skillevaluator.tier3.case_ids import validate_case_id
+            selected_cases = [case for case in value["evals"] if validate_case_id(case.get("id")) in requested]
+            if {validate_case_id(case["id"]) for case in selected_cases} != requested:
+                raise ValueError("Unknown --case-id in selected dataset")
+            value["evals"] = selected_cases
+            content = (json.dumps(value, indent=2) + "\n").encode()
         # Do not expose unused held-outs; preserve non-dataset JSON configuration.
         for path in (target / "evals").glob("*.json"):
             value = json.loads(path.read_text())
@@ -244,7 +304,7 @@ def stage_skill(source: Path, target: Path, dataset: str, tier3: bool, base: str
         # Missing datasets remain a visible strict-validation failure, never auto-generated.
         if (target / "evals/evals.json").is_file():
             (target / "evals/evals.json").unlink()
-    if base is None:
+    if base is None and not case_ids:
         return
     config_path = target / "evals/config.yml"
     alternate = target / "evals/config.yaml"
@@ -261,6 +321,10 @@ def stage_skill(source: Path, target: Path, dataset: str, tier3: bool, base: str
     harbor = config.setdefault("harbor", {})
     if not isinstance(harbor, dict):
         raise ValueError("harbor configuration must be a mapping")
+    if case_ids and harbor.get("task_source") == "native_harbor":
+        raise ValueError("--case-id does not support native_harbor task sources")
+    if base is None:
+        return
     runtime = harbor.setdefault("runtime_env", {})
     if not isinstance(runtime, dict):
         raise ValueError("runtime_env configuration must be a mapping")
@@ -450,6 +514,8 @@ def run(args: argparse.Namespace, environment: dict[str, str]) -> int:
         raise ValueError("Concurrency and time allowances must be finite positive values (outer timeout may be 0)")
     if args.retry_stage and not args.resume:
         raise ValueError("--retry-stage requires --resume")
+    if args.case_id and "3" not in tiers:
+        raise ValueError("--case-id requires Tier 3")
     bins = [path.resolve(strict=True) for path in args.tool_bin]
     if any(not path.is_dir() for path in bins):
         raise ValueError("--tool-bin needs directories")
@@ -487,6 +553,7 @@ def run(args: argparse.Namespace, environment: dict[str, str]) -> int:
     identities = {name: tree_digest(root) for name, root in named}
     spec = {
         "skills": identities, "tiers": sorted(tiers), "dataset": args.dataset,
+        "case_ids": sorted(set(args.case_id)),
         "completion_token_key": args.completion_token_key,
         "runner": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         "evaluator": tree_digest(source, {"__pycache__"}), "version": VERSION,
@@ -521,7 +588,7 @@ def run(args: argparse.Namespace, environment: dict[str, str]) -> int:
                 raise ValueError("Run directory is not empty; use --resume or a new directory")
             prepare_vendor(output / "vendor", source, args.completion_token_key)
             for name, root in named:
-                stage_skill(root, output / "snapshot/skills" / name, args.dataset, "3" in tiers, base)
+                stage_skill(root, output / "snapshot/skills" / name, args.dataset, "3" in tiers, base, args.case_id)
             if identities != {name: tree_digest(root) for name, root in named}:
                 raise ValueError("Skill inputs changed during staging; use a new run directory")
             state = {"schema_version": 1, "spec": spec, "stages": {},

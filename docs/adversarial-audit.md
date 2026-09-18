@@ -144,17 +144,62 @@ partial coverage; removing only that line gives complete coverage and SAFE.
 The evaluator rejects the severity/recommendation combination before LLM
 enrichment. Do not remove useful version metadata to game this scanner.
 
-Disposition: investigate upstream removal/correction, not skill rewriting.
-Proposed rubric fix for a separately qualified evaluator revision: use labeled
-XML-like document boundaries instead of additional YAML delimiters. Proposed
-scanner fix: parse frontmatter scalars and exclude semantic-version metadata from
-local-file reference candidates, while retaining actual linked-path checks.
-Neither external tool patch is applied here; raw failures remain visible.
+Disposition: clarify boundary in isolated tooling, not skill rewriting; fixed.
+The runner's isolated rubric patch uses `<skill_document>` boundaries instead
+of additional YAML delimiters, without changing criteria or thresholds. All six
+rubrics passed on retry. The separately retained
+`plugins/nautilus-trader/evals/skillspector-2.11.2-version.patch` excludes only
+quoted numeric three-part version scalars inside frontmatter from the quoted-path
+heuristic. Explicit links, path prefixes, other keys and body strings still scan.
+The isolated scanner fixture now reports complete coverage and SAFE; this is not
+proof that full skill security scans completed. Both patches leave global tools
+and historical results unchanged.
 
-The additional NVIDIA author policy requires `Name <email@host>` while the
-skills identify `kmshdev`. Preserve the real author; request an approved contact
-before a submission profile requiring email. Do not invent one. None of these
-observations establishes a completed security scan.
+The owner supplied `Keshav Mishra <me@kmsh.dev>` for NVIDIA's author policy.
+All six skill author fields now use that approved public contact. Subsequent
+LLM security enrichment failures were independently diagnosed as Azure HTTP 429,
+not missing author metadata or a reason to suppress security analysis.
+
+### 8. Container handoff can wait indefinitely for stdin EOF — confirmed stall
+
+File: `plugins/nautilus-trader/scripts/run_skill_eval.py`, `PATCHES` entries for
+`secure_docker_environment.py` and the Harbor runner.
+
+Excerpt: `umask 077; cat > "$1"`. Retained setup/execution traces block in this
+handoff before agent work. A stalled container had received a complete 943-byte,
+shell-syntax-valid script but its `cat` remained alive. Forty nonsecret Docker
+and Compose probes succeeded; the exact trigger for lost EOF is unproven.
+
+Disposition: clarify completion boundary; fixed in isolated tooling. Read exactly
+the UTF-8 payload's byte length with `head -c "$2"`, then require `wc -c` to
+match. Credentials remain stdin-only, with mode 0600, existing ownership,
+deletion and cancellation cleanup preserved. Tests establish completion while
+stdin remains open and rejection of truncated input. The Harbor child derives
+`PYTHONPATH` from the reviewed vendor module root rather than inheriting an
+arbitrary ambient path or silently importing the global unpatched evaluator.
+Live retries passed runtime setup and reached actual agent work; deployment's
+formerly stalled case completed both arms. Later judge 429s are a separate issue.
+
+### 9. Concurrent retries exhaust the shared provider limit — confirmed errors
+
+Locations: private retry reports and sanitized scanner diagnostic;
+`evals/README.md`, scheduling guidance.
+
+Excerpt: `HTTP 429` / `rate_limit_exceeded` in required actor, strategy and data
+judges and SkillSpector semantic analyzers. An autoreview also exhausted its
+reconnection budget. These are incomplete evaluations, not low skill scores.
+
+Disposition: clarify scheduling boundary. Run one paid evaluation process at a
+time; use SkillSpector's supported `SKILLSPECTOR_MAX_LLM_CONCURRENCY=1` and Harbor
+`--n-concurrent 1`. The evaluator initially dropped that setting from its child
+environment allowlist, so setting it in the shell alone did not limit requests.
+The isolated patch now adds only this nonsecret control to that allowlist;
+unrelated environment variables and credentials remain excluded. A shared
+provider can still throttle serialized work, so
+preserve failures and stop unchanged retries if the limit persists. The runner's
+`--case-id` filters only frozen staged datasets, retains paired arms, rejects
+unknown IDs and records selection in the resume identity. Do not merge subset
+receipts into a claimed complete six-attempt report.
 
 ## Inventory, loading and authority
 

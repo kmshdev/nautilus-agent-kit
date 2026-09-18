@@ -1,0 +1,35 @@
+--- a/skillspector/references.py
++++ b/skillspector/references.py
+@@ -27,6 +27,7 @@
+ _QUOTED_OR_CODE_PATH = re.compile(
+     r"(?:`|'|\")((?:\./)?(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\.[A-Za-z0-9]{1,12})(?:`|'|\")"
+ )
++_VERSION_SCALAR = re.compile(r'''^[ \t]*version:[ \t]*(["'])([0-9]+\.[0-9]+\.[0-9]+)\1[ \t]*(?:#.*)?$''')
+ # An interpreter command is an explicit path signal, but only its immediate
+ # script operand is eligible.  Searching the rest of the code span would turn
+ # strings passed to ``-c``/``-e`` and option values into fabricated references.
+@@ -85,9 +86,13 @@
+         _INLINE_CODE_COMMAND_PATH,
+         _PLAIN_RELATIVE_PATH,
+     )
++    frontmatter = text.startswith(("---\n", "---\r\n"))
+     for line_number, line in enumerate(StringIO(text), 1):
+         if clock() >= deadline:
+             return candidates, ("runtime",)
++        if line_number > 1 and line.strip() in {"---", "..."}:
++            frontmatter = False
++        version_scalar = _VERSION_SCALAR.fullmatch(line.rstrip("\r\n")) if frontmatter else None
+         cleaned_line = " ".join(line.strip().split())
+         iterators: list[Iterator[re.Match[str]]] = [pattern.finditer(line) for pattern in patterns]
+         pending: list[tuple[int, int, int, re.Match[str]]] = []
+@@ -107,7 +112,9 @@
+             _, _, pattern_index, match = heapq.heappop(pending)
+             raw = match.group(1).strip().split(maxsplit=1)[0]
+             key = (line_number, match.start(1), raw)
+-            if key not in seen:
++            if key not in seen and not (
++                pattern_index == 1 and version_scalar is not None and raw == version_scalar.group(2)
++            ):
+                 seen.add(key)
+                 candidates.append(
+                     (

@@ -2,7 +2,7 @@
 name: building-nautilus-actors
 description: Implement, diagnose, or review order-free Nautilus Rust actors, timers, indicator warm-up, and custom-data publication. Excludes order execution and node deployment.
 metadata:
-  author: kmshdev
+  author: Keshav Mishra <me@kmsh.dev>
   version: "0.64.0"
 ---
 

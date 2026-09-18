@@ -2,7 +2,7 @@
 name: running-nautilus-live
 description: Compose, diagnose, or review native Nautilus Rust nodes, routing, readiness, persistence, reconciliation, recovery, and shutdown. Databento and IBKR recipes; excludes strategy rules and CI/container deployment scaffolding.
 metadata:
-  author: kmshdev
+  author: Keshav Mishra <me@kmsh.dev>
   version: "0.64.0"
 ---
 

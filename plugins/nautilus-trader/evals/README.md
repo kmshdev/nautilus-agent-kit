@@ -194,6 +194,35 @@ These are supported `tier3 evaluate` options, not scoring overrides; apply them
 equally to both arms in a fresh run and record the changed time/scheduling
 conditions. Do not rerun successful cases or retry unchanged failures blindly.
 
+## Standalone retry tooling
+
+The standalone runner applies exact-source compatibility patches only to its
+private evaluator copy: GPT-6 temperature selection, the explicitly selected
+completion-token key, rubric document boundaries, trusted vendor propagation
+to Harbor, and byte-counted private stdin handoff. It preserves numeric budgets,
+grading criteria, paired arms, runtime preflight and cleanup. Changed upstream
+source fails patch preparation instead of receiving a guessed replacement.
+The isolated security-validator patch forwards only the supported scanner
+concurrency setting through its otherwise unchanged environment allowlist.
+
+`skillspector-2.11.2-version.patch` is separately qualified against SkillSpector
+2.11.2. Apply it only to the isolated scanner install: numeric version metadata
+is not a quoted local-file reference, but explicit paths/links remain scanned.
+Do not remove skill version metadata or disable LLM enrichment to obtain a pass.
+
+For a rate-limited provider, run one paid evaluation process at a time with
+`SKILLSPECTOR_MAX_LLM_CONCURRENCY=1` and `--n-concurrent 1`. The former is
+SkillSpector's supported cross-analyzer request limiter; neither setting raises
+the provider quota. Record these settings with the results. If required judges
+still return 429, retain an incomplete result rather than treating it as a grade.
+
+Use repeatable `--case-id CASE` with Tier 3 to retry identified failing cases
+in a new output directory. Selection changes only the frozen staged dataset,
+rejects unknown IDs and participates in resume identity. Both arms still run.
+Native Harbor task sources and missing JSON datasets are rejected with this
+option rather than accidentally executing cases outside the requested subset.
+Subset results are separate regression evidence, not a replacement full report.
+
 ## Legacy single-entry cases
 
 [evals.json](evals.json) contains task prompts, minimal relevant references and

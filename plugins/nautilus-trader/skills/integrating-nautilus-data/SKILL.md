@@ -2,7 +2,7 @@
 name: integrating-nautilus-data
 description: Implement, diagnose, or review Nautilus Rust ingestion, instrument identity, subscriptions, history, codecs, and catalogs. Databento and IBKR recipes; excludes trading rules.
 metadata:
-  author: kmshdev
+  author: Keshav Mishra <me@kmsh.dev>
   version: "0.64.0"
 ---
 
