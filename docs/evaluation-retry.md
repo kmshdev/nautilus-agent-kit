@@ -1,7 +1,8 @@
 # Standalone evaluation retry receipt
 
 Checkpoint: 2026-09-18 (Asia/Kolkata). This records evidence available at the
-checkpoint, not an all-tiers pass. Publication remains unapproved.
+checkpoint, not an all-tiers pass. The owner subsequently authorized a repository
+push and PR under `kmshdev/nautilus-agent-kit`, not an OpenAI marketplace submission.
 
 ## Environment and isolation
 
@@ -228,6 +229,7 @@ regressions, not fresh holdouts. Keep numeric token budgets and paired coverage.
 The previously missing behavior cases now have separate complete paired retry
 reports; no aggregate report or historical score has been rewritten. Full
 qualification remains open until the actor LLM scan completes and the remaining
-four Tier 1 scans are retried and reviewed. Author contact is approved;
-it is not permission to publish. Publishing, pushing,
-cloud deployment, broker access and strategy-project changes remain out of scope.
+four Tier 1 scans are retried and reviewed. The later repository push and PR
+authorization does not change these evaluation results. OpenAI marketplace
+submission, cloud deployment, broker access and strategy-project changes remain
+out of scope.

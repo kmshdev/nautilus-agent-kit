@@ -1,13 +1,19 @@
-# Nautilus Trader for Codex
+# Nautilus Agent Kit
 
 An independent Codex plugin for NautilusTrader 0.64.0 Rust workflows:
 actors, strategies, data, backtests, live nodes, and persistent run delivery.
 
+Repository: [kmshdev/nautilus-agent-kit](https://github.com/kmshdev/nautilus-agent-kit).
+The plugin and marketplace identifiers remain `nautilus-trader` so existing
+installations and project configuration keep working.
+
 ## Install from this checkout
 
-Run from the repository root:
+Clone the repository, then install from its root:
 
 ```sh
+git clone https://github.com/kmshdev/nautilus-agent-kit.git
+cd nautilus-agent-kit
 codex plugin marketplace add .
 codex plugin add nautilus-trader@nautilus-trader --json
 ```
@@ -45,5 +51,5 @@ python3 scripts/check.py
 uv run --with-requirements scripts/requirements-maintenance.txt python -m unittest discover -s scripts -p 'test_*.py'
 ```
 
-Keep scratch evidence under the ignored, branch-specific `.agent/main/`.
-No public submission is made by creating this checkout.
+Keep scratch evidence under an ignored, branch-specific `.agent/<branch>/`.
+Publishing this repository does not submit it to the OpenAI plugin marketplace.

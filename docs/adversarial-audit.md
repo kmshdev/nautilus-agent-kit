@@ -2,7 +2,9 @@
 
 Date: 2026-09-18. Baseline: `kmshdev/plugins` commit
 `b8b32b74be21c2b7f83d8dd394e79d9c345175c4`, extracted locally with plugin-creator.
-Publication is not authorized. Findings below distinguish inspected defects,
+Publication was not authorized at the audit checkpoint. The owner subsequently
+authorized a repository push and PR under `kmshdev/nautilus-agent-kit`; this does
+not authorize an OpenAI marketplace submission. Findings below distinguish inspected defects,
 predicted interactions and retained intentional constraints. This is not a claim
 that every upstream file, session or external plugin reference was reviewed.
 
