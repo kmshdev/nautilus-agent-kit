@@ -56,6 +56,15 @@ HTTP 429 even with the concurrency setting propagated. The finite serialized
 scan loop stopped on that failure; the remaining four scans were not launched.
 Another unchanged scan retry is not justified until provider capacity recovers.
 
+A later isolated recovery attempt at
+`.agent/main/evaluation-strategy-serial-recovery/` retried only
+`negative-ingestion`, with `--n-concurrent 1` and no other evaluation process.
+It finished with 1/2 scored: a required `goal_accuracy` judge still returned
+Azure HTTP 429. The installed container grader invokes accuracy, goal and
+behavior judges sequentially; there is no additional parallel judge pool to
+disable. This confirms provider capacity remains a blocker beyond scanner
+fan-out. No model, token budget, grading criterion or required judge was changed.
+
 The old wrapper incorrectly labels the complete backtest and live reports incomplete.
 The repaired completion checker accepts its canonical 6/6 report, deduplicating
 the `latest` alias, and correctly rejects the strategies 5/6 report. Raw receipts
