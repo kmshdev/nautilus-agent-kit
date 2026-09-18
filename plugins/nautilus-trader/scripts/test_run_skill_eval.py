@@ -210,6 +210,32 @@ class RunnerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "existing JSON dataset"):
             runner.stage_skill(self.skill(), self.root / "missing", "missing.json", True, None, ["42"])
 
+    def test_case_retry_rejects_multiple_skills_before_side_effects(self) -> None:
+        first, second = self.skill(), self.skill("second-skill")
+        (second / "evals/evals.json").write_text(json.dumps({
+            "evals": [{"id": "only-second", "prompt": "Synthetic test"}],
+        }))
+        before = runner.tree_digest(self.root / "skills")
+        output = self.root / "output"
+        for paths in ([first.parent], [first, second]):
+            with self.subTest(paths=paths), patch.object(sys, "argv", [
+                "run_skill_eval.py", *map(str, paths), "--output-dir", str(output),
+                "--tiers", "3", "--case-id", "only-second", "--execute",
+            ]):
+                args = runner.arguments()
+                environment = {"PATH": "unchanged"}
+                with patch("skillevaluator.provider_config.resolve_llm_provider") as provider, \
+                        patch.object(runner, "prepare_vendor") as vendor, \
+                        patch.object(runner, "command") as command:
+                    with self.assertRaisesRegex(ValueError, "--case-id requires exactly one skill"):
+                        runner.run(args, environment)
+                    provider.assert_not_called()
+                    vendor.assert_not_called()
+                    command.assert_not_called()
+                self.assertEqual(environment, {"PATH": "unchanged"})
+                self.assertFalse(output.exists())
+                self.assertEqual(runner.tree_digest(first.parent), before)
+
     def test_token_override_rejects_changed_selector_with_matching_return(self) -> None:
         old, template = runner.TOKEN_LIMIT_SELECTORS["inference/client.py"]
         changed = old.replace('startswith("gpt-5")', 'startswith("gpt-6")')

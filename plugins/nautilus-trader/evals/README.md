@@ -216,8 +216,11 @@ SkillSpector's supported cross-analyzer request limiter; neither setting raises
 the provider quota. Record these settings with the results. If required judges
 still return 429, retain an incomplete result rather than treating it as a grade.
 
-Use repeatable `--case-id CASE` with Tier 3 to retry identified failing cases
-in a new output directory. Selection changes only the frozen staged dataset,
+Use repeatable `--case-id CASE` with Tier 3 and exactly one selected skill to retry
+identified failing cases in a new output directory. Pass that skill's directory
+or `SKILL.md`, not a multi-skill collection. Multi-skill selection is rejected
+before provider setup or output creation; run separate commands for different
+skills. Selection changes only the frozen staged dataset,
 rejects unknown IDs and participates in resume identity. Both arms still run.
 Native Harbor task sources and missing JSON datasets are rejected with this
 option rather than accidentally executing cases outside the requested subset.

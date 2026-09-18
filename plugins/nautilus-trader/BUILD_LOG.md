@@ -648,8 +648,9 @@ six-skill revision. See the standalone repository's `docs/evaluation-retry.md` f
 isolated scanner installation, six-skill tier outcomes, source-grounded streaming
 corrections, 69 passing maintenance tests, clean-session forward verification
 and final autoreview. Full NVIDIA qualification remains incomplete; the running
-baseline, policy failures and raw grades are preserved. No public repository,
-push, submission, strategy edit or provider deployment is authorized or performed.
+baseline, policy failures and raw grades are preserved. At this checkpoint, no
+public repository, push, submission, strategy edit or provider deployment was
+authorized or performed.
 
 ### Retry-tooling and approved-author follow-up
 

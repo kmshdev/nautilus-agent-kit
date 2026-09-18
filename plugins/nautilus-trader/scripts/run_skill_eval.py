@@ -116,7 +116,7 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--tool-bin", type=Path, action="append", default=[], help="Additional scanner bin directory")
     parser.add_argument("--tiers", default="1,2,3", help="Comma-separated subset of 1,2,3")
     parser.add_argument("--dataset", default="working", help="working, acceptance, or skill-relative JSON path")
-    parser.add_argument("--case-id", action="append", default=[], help="Select explicit case IDs for a paired retry")
+    parser.add_argument("--case-id", action="append", default=[], help="Select explicit case IDs for a paired retry of one skill")
     parser.add_argument("--gateway", choices=("auto", "neon", "none"), default="auto")
     parser.add_argument("--agent-model", help="OpenCode provider/model; inferred for OpenAI-compatible grading")
     parser.add_argument("--agent-base-url", help="Agent-only SDK base; must share the grader's HTTPS origin")
@@ -269,6 +269,11 @@ def agent_base(base: str | None, gateway: str, override: str | None) -> str | No
 
 def stage_skill(source: Path, target: Path, dataset: str, tier3: bool, base: str | None,
                 case_ids: list[str] | None = None) -> None:
+    """Copy a skill into a frozen snapshot and select its dataset without changing source.
+
+    Case selection supports existing JSON datasets only; unknown IDs and native
+    Harbor task sources are rejected rather than widening the requested subset.
+    """
     import yaml
     target.mkdir(parents=True)
     for path in files(source):
@@ -503,6 +508,11 @@ def docker_ready(environment: dict[str, str] | None = None) -> bool:
 
 
 def run(args: argparse.Namespace, environment: dict[str, str]) -> int:
+    """Validate inputs, stage or resume frozen evidence, and run the selected tiers.
+
+    Case-selected retries require one discovered skill before setup begins.
+    Resume requires matching identities; incomplete paired reports cannot pass.
+    """
     from skillevaluator.provider_config import resolve_embedding_provider, resolve_llm_provider
 
     tiers = set(args.tiers.split(","))
@@ -516,6 +526,9 @@ def run(args: argparse.Namespace, environment: dict[str, str]) -> int:
         raise ValueError("--retry-stage requires --resume")
     if args.case_id and "3" not in tiers:
         raise ValueError("--case-id requires Tier 3")
+    roots = discover(args.paths)
+    if args.case_id and len(roots) != 1:
+        raise ValueError("--case-id requires exactly one skill; select its directory or SKILL.md")
     bins = [path.resolve(strict=True) for path in args.tool_bin]
     if any(not path.is_dir() for path in bins):
         raise ValueError("--tool-bin needs directories")
@@ -543,7 +556,6 @@ def run(args: argparse.Namespace, environment: dict[str, str]) -> int:
     if importlib.metadata.version("skillevaluator") != VERSION:
         raise ValueError("Only the reviewed SkillEvaluator 0.2.1 profile is supported; requalify upgrades explicitly")
     source = Path(importlib.util.find_spec("skillevaluator").submodule_search_locations[0])
-    roots = discover(args.paths)
     named = [(skill_name(root), root) for root in roots]
     if len({name for name, _ in named}) != len(named):
         raise ValueError("Duplicate skill names would collide; select unique skills")
