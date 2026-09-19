@@ -644,9 +644,31 @@ remain intact and distinguish tool visibility from actual content defects.
 ## 2026-09-18 — Standalone 0.64 retry checkpoint
 
 The historical five-skill qualification above does not qualify this standalone
-six-skill revision. See [the retry receipt](../../docs/evaluation-retry.md) for
+six-skill revision. See the standalone repository's `docs/evaluation-retry.md` for
 isolated scanner installation, six-skill tier outcomes, source-grounded streaming
 corrections, 69 passing maintenance tests, clean-session forward verification
 and final autoreview. Full NVIDIA qualification remains incomplete; the running
-baseline, policy failures and raw grades are preserved. No public repository,
-push, submission, strategy edit or provider deployment is authorized or performed.
+baseline, policy failures and raw grades are preserved. At this checkpoint, no
+public repository, push, submission, strategy edit or provider deployment was
+authorized or performed.
+
+### Retry-tooling and approved-author follow-up
+
+The owner approved `Keshav Mishra <me@kmsh.dev>` for the manifest and all six
+skills. NVIDIA schema checks pass for all six. Isolated rubric delimiter and
+scanner version-reference fixes preserve metadata and grading requirements;
+all six rubric retries pass. Backtest's limited-concurrency Tier 1 retry also
+passes the complete security scan. Actor LLM scanning still returns Azure 429
+at concurrency one, so the remaining serialized scan loop stopped visibly.
+
+Container stdin handoff now uses exact byte counting without awaiting EOF,
+and Harbor children use the same reviewed private evaluator. Deployment's
+formerly stalled case completes both arms; remaining actor/strategy/data judge
+429s are not scored as skill failures. Case-selected retries preserve both arms,
+accept upstream integer IDs and reject unsupported native task sources.
+
+All 77 maintenance tests, two isolated scanner-patch tests, six official skill
+validators, plugin/schema checks and source/resource checks pass. Autoreview's
+native-task subset finding was fixed and regression-tested. The current plugin
+was reinstalled in the isolated test home. See the standalone repository's
+`docs/evaluation-retry.md` for exact receipts and incomplete qualification gates.

@@ -2,7 +2,7 @@
 name: deploying-nautilus-runs
 description: Scaffold persistent Nautilus Rust runs, CI/CD and cloud storage with PostgreSQL, Redis and Parquet. Use for run isolation and container delivery; not strategy rules or unrelated infrastructure.
 metadata:
-  author: kmshdev
+  author: Keshav Mishra <me@kmsh.dev>
   version: "0.64.0"
 ---
 

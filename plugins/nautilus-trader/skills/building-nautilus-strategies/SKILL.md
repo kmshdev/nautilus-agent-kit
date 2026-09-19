@@ -2,7 +2,7 @@
 name: building-nautilus-strategies
 description: Implement, diagnose, or review Nautilus Rust strategy rules, sizing, orders, execution callbacks, and order-lifecycle races. Excludes data ingestion and infrastructure deployment.
 metadata:
-  author: kmshdev
+  author: Keshav Mishra <me@kmsh.dev>
   version: "0.64.0"
 ---
 

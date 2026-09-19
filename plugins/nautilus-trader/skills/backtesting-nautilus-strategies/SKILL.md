@@ -2,7 +2,7 @@
 name: backtesting-nautilus-strategies
 description: Implement, diagnose, or review Nautilus Rust backtests, replay chronology, fill assumptions, and economic comparisons. Excludes broker operations and generic test-tooling fixes.
 metadata:
-  author: kmshdev
+  author: Keshav Mishra <me@kmsh.dev>
   version: "0.64.0"
 ---
 

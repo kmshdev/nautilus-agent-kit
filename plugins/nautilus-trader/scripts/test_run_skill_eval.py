@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import copy
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -119,6 +121,120 @@ class RunnerTests(unittest.TestCase):
                     self.assertEqual(namespace["payload"](1024), {key: 1024})
                 with self.assertRaises(ValueError):
                     runner.patch_source(patched, old, template.replace("TOKEN_KEY", key))
+
+    def handoff_command(self) -> str:
+        replacement = runner.PATCHES["tier3/harbor/secure_docker_environment.py"][1]
+        line = next(line.strip() for line in replacement.splitlines() if "umask 077;" in line)
+        return ast.literal_eval(line.rstrip(","))
+
+    def test_handoff_completes_without_eof_and_preserves_private_exact_bytes(self) -> None:
+        payload = "export SYNTHETIC='Unicode λ and quotes'\n".encode()
+        target = self.root / "handoff.sh"
+        process = subprocess.Popen(
+            ["sh", "-c", self.handoff_command(), "sh", str(target), str(len(payload))],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+        try:
+            process.stdin.write(payload)
+            process.stdin.flush()
+            self.assertEqual(process.wait(timeout=3), 0)
+            self.assertFalse(process.stdin.closed)
+            self.assertEqual(target.read_bytes(), payload)
+            self.assertEqual(target.stat().st_mode & 0o777, 0o600)
+        finally:
+            if process.poll() is None:
+                process.kill()
+            process.communicate()
+
+    def test_handoff_rejects_truncated_payload(self) -> None:
+        target = self.root / "handoff.sh"
+        result = subprocess.run(
+            ["sh", "-c", self.handoff_command(), "sh", str(target), "100"],
+            input=b"too short", capture_output=True, timeout=3,
+        )
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_scanner_concurrency_allowlist_does_not_forward_arbitrary_environment(self) -> None:
+        replacement = runner.PATCHES["validators/security.py"][1]
+        namespace = {}
+        exec(replacement + '\n        "PATH",\n    }\n)', namespace)
+        allowed = namespace["_SKILLSPECTOR_PROCESS_ENV_NAMES"]
+        environment = {"SKILLSPECTOR_MAX_LLM_CONCURRENCY": "1", "PATH": "/retained", "UNRELATED_SECRET": "private"}
+        self.assertEqual({key: value for key, value in environment.items() if key in allowed},
+                         {"SKILLSPECTOR_MAX_LLM_CONCURRENCY": "1", "PATH": "/retained"})
+
+    def test_harbor_uses_current_vendor_not_ambient_pythonpath(self) -> None:
+        replacement = runner.PATCHES["tier3/harbor/runner.py"][1]
+        body = replacement.split("\n\ndef ", 1)[0]
+        source = self.root / "vendor/skillevaluator/tier3/harbor/runner.py"
+        namespace = {"Path": Path, "__file__": str(source)}
+        exec("def build(environment):\n" + body, namespace)
+        result = namespace["build"]({"PYTHONPATH": "/untrusted", "PATH": "/retained"})
+        self.assertEqual(result, {"PYTHONPATH": str((self.root / "vendor").resolve()), "PATH": "/retained"})
+
+    def test_case_retry_stages_only_requested_cases_without_changing_source(self) -> None:
+        skill = self.skill()
+        dataset = skill / "evals/evals.json"
+        data = json.loads(dataset.read_text())
+        data["evals"].append({"id": "second", "prompt": "Another case"})
+        dataset.write_text(json.dumps(data))
+        before = runner.tree_digest(skill)
+        target = self.root / "subset"
+        runner.stage_skill(skill, target, "working", True, None, ["second"])
+        staged = json.loads((target / "evals/evals.json").read_text())
+        self.assertEqual(staged["evals"], [data["evals"][1]])
+        self.assertEqual(runner.tree_digest(skill), before)
+        with self.assertRaisesRegex(ValueError, "Unknown --case-id"):
+            runner.stage_skill(skill, self.root / "invalid", "working", True, None, ["missing"])
+
+    def test_case_retry_accepts_upstream_integer_ids(self) -> None:
+        skill = self.skill()
+        dataset = skill / "evals/evals.json"
+        data = json.loads(dataset.read_text())
+        data["evals"][0]["id"] = 42
+        dataset.write_text(json.dumps(data))
+        target = self.root / "numeric-subset"
+        runner.stage_skill(skill, target, "working", True, None, ["42"])
+        self.assertEqual(json.loads((target / "evals/evals.json").read_text())["evals"], data["evals"])
+
+    def test_case_retry_rejects_native_tasks_with_or_without_endpoint_override(self) -> None:
+        skill = self.skill()
+        (skill / "evals/config.yaml").write_text("harbor:\n  task_source: native_harbor\n")
+        before = runner.tree_digest(skill)
+        for index, base in enumerate([None, "https://unit.example/v1"]):
+            with self.subTest(base=base), self.assertRaisesRegex(ValueError, "native_harbor"):
+                runner.stage_skill(skill, self.root / f"native-{index}", "working", True, base, ["evals.json"])
+        self.assertEqual(runner.tree_digest(skill), before)
+
+    def test_case_retry_rejects_missing_json_before_native_fallback(self) -> None:
+        with self.assertRaisesRegex(ValueError, "existing JSON dataset"):
+            runner.stage_skill(self.skill(), self.root / "missing", "missing.json", True, None, ["42"])
+
+    def test_case_retry_rejects_multiple_skills_before_side_effects(self) -> None:
+        first, second = self.skill(), self.skill("second-skill")
+        (second / "evals/evals.json").write_text(json.dumps({
+            "evals": [{"id": "only-second", "prompt": "Synthetic test"}],
+        }))
+        before = runner.tree_digest(self.root / "skills")
+        output = self.root / "output"
+        for paths in ([first.parent], [first, second]):
+            with self.subTest(paths=paths), patch.object(sys, "argv", [
+                "run_skill_eval.py", *map(str, paths), "--output-dir", str(output),
+                "--tiers", "3", "--case-id", "only-second", "--execute",
+            ]):
+                args = runner.arguments()
+                environment = {"PATH": "unchanged"}
+                with patch("skillevaluator.provider_config.resolve_llm_provider") as provider, \
+                        patch.object(runner, "prepare_vendor") as vendor, \
+                        patch.object(runner, "command") as command:
+                    with self.assertRaisesRegex(ValueError, "--case-id requires exactly one skill"):
+                        runner.run(args, environment)
+                    provider.assert_not_called()
+                    vendor.assert_not_called()
+                    command.assert_not_called()
+                self.assertEqual(environment, {"PATH": "unchanged"})
+                self.assertFalse(output.exists())
+                self.assertEqual(runner.tree_digest(first.parent), before)
 
     def test_token_override_rejects_changed_selector_with_matching_return(self) -> None:
         old, template = runner.TOKEN_LIMIT_SELECTORS["inference/client.py"]
